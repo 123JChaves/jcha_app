@@ -22,7 +22,7 @@ import VisualizarEmpresa from './src/app/paginas/empresas/[id]/page';
 import EditarEmpresa from './src/app/paginas/empresas/[id]/edicao/page';
 
 import MenuPlantoes from './src/app/paginas/plantoes/menu/page';
-import DetalhePlantao from './src/app/paginas/plantoes/[id]/page'; // INCLUSÃO: Importação da tela dinâmica
+import DetalhePlantao from './src/app/paginas/plantoes/[id]/page';
 
 import MenuRotas from './src/app/paginas/rotas/menu/page';
 import CadastrarRotas from './src/app/paginas/rotas/cadastrar/page';
@@ -76,7 +76,6 @@ export default function App() {
               <Stack.Screen name="EditarEmpresa" component={EditarEmpresa} options={{ title: 'Editar Empresa' }} />
             </Stack.Group>
 
-            {/* INCLUSÃO: Grupo de telas de plantões com a listagem dinâmica adicionada */}
             <Stack.Group>
               <Stack.Screen name="MenuPlantoes" component={MenuPlantoes} options={{ title: 'Escalas e Plantões' }} />
               <Stack.Screen name="DetalhePlantao" component={DetalhePlantao} options={{ title: 'Fila de Joinhas do Dia' }} />

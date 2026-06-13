@@ -56,3 +56,6 @@ Para implementar o recurso de arrastar e soltar (Drag and Drop) no React Native:
 
 Biblioteca de calendário:
 [Comando:] `npx expo install @react-native-community/datetimepicker`
+
+Comando Completo:
+[Comando:] `npm install expo@54.0.35 react-native@0.81.5 react@19.1.0 @types/react@19.1.10 @expo/vector-icons@15.0.3 @react-native-async-storage/async-storage@2.2.0 @react-native-community/datetimepicker@8.4.4 @react-native-picker/picker@2.11.1 expo-image-picker@17.0.11 expo-status-bar@3.0.9 react-native-gesture-handler@2.28.0 react-native-safe-area-context@5.6.0 react-native-screens@4.16.0 typescript@5.9.2`

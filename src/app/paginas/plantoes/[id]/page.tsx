@@ -44,16 +44,17 @@ export default function DetalhePlantao() {
     const [filtroNomeRotaInput, setFiltroNomeRotaInput] = useState<string>('');
     const [sugestoesGlobaisRota, setSugestoesGlobaisRota] = useState<any[]>([]);
 
-     // Estados para controle da tela cheia de busca inline dentro das rotas
+    // Estados para controle da tela cheia de busca inline dentro das rotas
     const [rotaEmEdicaoObjeto, setRotaEmEdicaoObjeto] = useState<IRotaAtribuida | null>(null);
     
     const AZUL_MOOVE = "#0056b3"; 
     const timerBuscaRef = useRef<any>(null);
 
-    // Função para subtrair 1 dia da data ISO (Ajuste Cronológico)
+    // Função para subtrair 1 dia da data ISO (Ajuste Cronológico Blindado)
     const subtrairUmDia = (dataIso: string): string => {
         if (!dataIso) return '';
-        const partes = dataIso.split('-');
+        const stringLimpa = dataIso.replace(/\//g, '-');
+        const partes = stringLimpa.split('-');
         if (partes.length !== 3) return dataIso;
         
         const ano = parseInt(partes[0], 10);
@@ -78,7 +79,7 @@ export default function DetalhePlantao() {
                 
                 const dadosTratados = (res.data.dados || []).map((item: any, index: number) => ({
                     ...item,
-                    chaveUnica: item.whatsAppLid ? `${item.whatsAppLid}_${index}_${res.data.dados.length}` : `mot_${index}_${res.data.dados.length}`
+                    chaveUnica: item.whatsAppLid ? `${item.whatsAppLid}_${index}` : `mot_${index}`
                 }));
                 
                 setListaEscala(dadosTratados);
@@ -90,45 +91,65 @@ export default function DetalhePlantao() {
                 const dataGeracao = subtrairUmDia(id);
                 const urlAlvo = abaAtiva === 'TARDE' ? `/whatsapp/rotas-tarde` : `/whatsapp/rotas-madrugada`;
                 const res = await instancia.get(urlAlvo, { params: { data: dataGeracao } });
-                setListaRotas(res.data.dados || []);
-                setDataExibicaoDinamica(res.data.dataExibicaoTexto || ''); 
+                
+                // Normaliza o payload para aceitar arrays ou objetos indexados
+                const dadosCruas = res.data.dados || [];
+                const dadosRotas = Array.isArray(dadosCruas) ? dadosCruas : Object.values(dadosCruas);
+                
+                setListaRotas(dadosRotas);
+                if (res.data.dataExibicaoTexto) {
+                    setDataExibicaoDinamica(res.data.dataExibicaoTexto);
+                }
             }
-        } catch (error) { 
-            Alert.alert("Erro", "Não foi possível carregar os dados operacionais."); 
+        } catch (error: any) { 
+            // 🔥 INSPEÇÃO OPERACIONAL EM TELA: Captura a stack trace ou mensagem real de estouro de memória
+            const descricaoErroJs = error?.message || "Erro JavaScript Genérico";
+            const statusHttp = error?.response?.status || "Sem Status HTTP";
+            const respostaServidor = JSON.stringify(error?.response?.data || "Sem corpo de resposta");
+
+            // Força a exibição amigável dos dados brutos quebrados para você debugar visualmente
+            Alert.alert(
+                "🚨 DETECTOR DE FALHAS REAL",
+                `Mensagem JS: ${descricaoErroJs}\n\nStatus API: ${statusHttp}\n\nRetorno Banco: ${respostaServidor.substring(0, 200)}`
+            );
         } finally { 
             setLoading(false); 
             setBuscandoDados(false);
         } 
-    }; 
+    };
 
     useEffect(() => { 
-        if (isFocused && id) {
+        let ativo = true;
+        if (isFocused && id && ativo) {
             carregarDadosAba(); 
         }
+        return () => { ativo = false; };
     }, [isFocused, id, abaAtiva]);
-        // 1. FILTRAGEM DINÂMICA DE MOTORISTAS ATIVOS POR NOME PARCIAL (TOPO)
     const lidarComMudancaTextoNome = async (texto: string) => {
         setNomeBuscaInput(texto);
         setMotoristaSelecionado(null); 
 
+        if (timerBuscaRef.current) clearTimeout(timerBuscaRef.current);
+
         if (texto.trim().length >= 3) {
-            try {
-                setBuscandoMotoristas(true);
-                const res = await instancia.get('/whatsapp/motoristas/buscar-por-nome', {
-                    params: { nome: texto.trim() }
-                });
-                setSugestoesMotoristas(res.data || []);
-            } catch (err) {
-                console.error("Erro ao buscar motoristas por nome:", err);
-            } finally {
-                setBuscandoMotoristas(false);
-            }
+            timerBuscaRef.current = setTimeout(async () => {
+                try {
+                    setBuscandoMotoristas(true);
+                    const res = await instancia.get('/whatsapp/motoristas/buscar-por-nome', {
+                        params: { nome: texto.trim() }
+                    });
+                    setSugestoesMotoristas(res.data || []);
+                } catch (err) {
+                    console.error("Erro ao buscar motoristas por nome:", err);
+                } finally {
+                    setBuscandoMotoristas(false);
+                }
+            }, 400);
         } else {
             setSugestoesMotoristas([]);
         }
     };
 
-    // 2. SELECIONA O MOTORISTA DA LISTA DE OPÇÕES SUGERIDAS (TOPO)
     const selecionarMotoristaSugerido = (motorista: { whatsAppLid: string; nome: string }) => {
         setMotoristaSelecionado(motorista);
         setNomeBuscaInput(motorista.nome); 
@@ -136,7 +157,6 @@ export default function DetalhePlantao() {
         Keyboard.dismiss();
     };
 
-    // 3. AÇÃO: INSERIR MOTORISTA MANUAL NA POSIÇÃO ESCOLHIDA (FILA)
     const handleInserirManual = async () => {
         if (!motoristaSelecionado || !novaPosicaoInput.trim() || !idListaBanco) {
             Alert.alert("Aviso", "Selecione um motorista da lista sugerida e informe a posição.");
@@ -165,7 +185,6 @@ export default function DetalhePlantao() {
         }
     };
 
-    // 4. AÇÃO: REORDENAR POSIÇÃO NA FILA (SUBIR OU DESCER)
     const handleMoverMotorista = async (whatsappId: string, posicaoAtual: number, direcao: 'SUBIR' | 'DESCER') => {
         if (!idListaBanco) return;
         const novaPosicaoAlvo = direcao === 'SUBIR' ? posicaoAtual - 1 : posicaoAtual + 1;
@@ -184,7 +203,6 @@ export default function DetalhePlantao() {
         }
     };
 
-    // 5. AÇÃO: EXCLUIR MOTORISTA DA FILA (ESCALA DO DIA)
     const handleExcluirMotorista = (whatsappId: string, nome: string) => {
         if (!idListaBanco) return;
         Alert.alert(
@@ -207,7 +225,6 @@ export default function DetalhePlantao() {
         );
     };
 
-    // 6. AÇÃO: FIXAR MOTORISTA DA FILA COMO APOIO MANUALMENTE
     const handleForcarEscalaApoio = async (whatsappId: string) => {
         if (!idListaBanco) {
             Alert.alert("Erro", "ID da lista não identificado. Carregue os dados novamente.");
@@ -215,10 +232,7 @@ export default function DetalhePlantao() {
         }
         try {
             setLoading(true);
-            await instancia.post('/whatsapp/escala/apoio-manual', { 
-                whatsappId, 
-                listaId: idListaBanco 
-            });
+            await instancia.post('/whatsapp/escala/apoio-manual', { whatsappId, listaId: idListaBanco });
             Alert.alert("Sucesso", "Motorista fixado e congelado na escala de Apoio!");
             carregarDadosAba(); 
         } catch (err: any) {
@@ -228,15 +242,11 @@ export default function DetalhePlantao() {
         }
     };
 
-    // 6-B. AÇÃO: REMOVER A FIXAÇÃO DE APOIO DA FILA
     const handleDesfixarEscalaApoio = async (whatsappId: string) => {
         if (!idListaBanco) return;
         try {
             setLoading(true);
-            await instancia.post('/whatsapp/escala/apoio-desfixar', { 
-                whatsappId, 
-                listaId: idListaBanco 
-            });
+            await instancia.post('/whatsapp/escala/apoio-desfixar', { whatsappId, listaId: idListaBanco });
             Alert.alert("Sucesso", "O motorista foi reintegrado à ordem de fila normal.");
             carregarDadosAba(); 
         } catch (err: any) {
@@ -246,16 +256,11 @@ export default function DetalhePlantao() {
         }
     };
 
-    // 7. AÇÃO: VINCULAR QUALQUER MOTORISTA DO BANCO DIRETO EM UMA ROTA VAGA
     const handleForcarRotaApoio = async (whatsappId: string, rotaId: number) => {
         if (!idListaBanco) return;
         try {
             setLoading(true);
-            await instancia.post('/whatsapp/escala/rota-manual', { 
-                whatsappId, 
-                listaId: idListaBanco, 
-                rotaId 
-            });
+            await instancia.post('/whatsapp/escala/rota-manual', { whatsappId, listaId: idListaBanco, rotaId });
             Alert.alert("Sucesso", "Motorista alocado na rota comercial!");
             carregarDadosAba();
         } catch (err: any) {
@@ -265,22 +270,87 @@ export default function DetalhePlantao() {
         }
     };
 
-    // 7-B. 🚀 REAPROVEITAMENTO CIRÚRGICO: Remove o motorista da rota passando whatsappId vazio ("")
     const handleDesvincularRota = async (rotaId: number) => {
         if (!idListaBanco) return;
         try {
             setLoading(true);
-            await instancia.post('/whatsapp/escala/rota-manual', { 
-                whatsappId: "", // Aciona o DELETE preventivo no backend
-                listaId: idListaBanco, 
-                rotaId 
-            });
+            await instancia.post('/whatsapp/escala/rota-manual', { whatsappId: "", listaId: idListaBanco, rotaId });
             Alert.alert("Sucesso", "A vaga foi aberta e encontra-se disponível novamente.");
             carregarDadosAba(); 
         } catch (err: any) {
             Alert.alert("Erro ao Desvincular", err.response?.data?.error || "Falha ao remover motorista.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRedistribuirOriginal = () => {
+        Alert.alert(
+            "Redistribuir Escala",
+            "Deseja limpar as alterações manuais e rodar a redistribuição automática do robô para este dia?",
+            [
+                { text: "Cancelar", style: "cancel" },
+                { text: "Sim, Redistribuir", style: "destructive", onPress: async () => {
+                    try {
+                        setLoading(true);
+                        const res = await instancia.post('/whatsapp/escala/redistribuir', null, { params: { data: id } });
+                        Alert.alert("Sucesso", res.data.message || "Escala redistribuída com sucesso!");
+                        carregarDadosAba();
+                    } catch (err: any) {
+                        Alert.alert("Erro ao redistribuir", err.response?.data?.error || "Falha na comunicação com o robô.");
+                    } finally {
+                        setLoading(false);
+                    }
+                }}
+            ]
+        );
+    };
+
+    const renderizarFilaComLacunas = (): IMotoristaEscala[] => {
+        if (listaEscala.length === 0) return [];
+        const mapaMotoristas = new Map<number, IMotoristaEscala>();
+        let maiorPosicaoSalva = 0;
+
+        listaEscala.forEach(m => {
+            const pos = m.posicao || 0;
+            mapaMotoristas.set(pos, m);
+            if (pos > maiorPosicaoSalva) maiorPosicaoSalva = pos;
+        });
+
+        const filaCompleta: IMotoristaEscala[] = [];
+        for (let i = 1; i <= maiorPosicaoSalva; i++) {
+            const motoristaExistente = mapaMotoristas.get(i);
+            if (motoristaExistente) {
+                filaCompleta.push(motoristaExistente);
+            } else {
+                filaCompleta.push({
+                    id: -i,
+                    posicao: i,
+                    categoria: "LIVRE",
+                    isPenalizado: false,
+                    whatsAppLid: `vaga_${i}`,
+                    motorista: { nome: "" }
+                } as any);
+                (filaCompleta[filaCompleta.length - 1] as any).isVagaOperacional = true;
+            }
+        }
+        return filaCompleta;
+    };
+
+    const buscarMotoristasParaRota = async (texto: string) => {
+        setFiltroNomeRotaInput(texto);
+        if (timerBuscaRef.current) clearTimeout(timerBuscaRef.current);
+        if (texto.trim().length >= 3) {
+            timerBuscaRef.current = setTimeout(async () => {
+                try {
+                    const res = await instancia.get('/whatsapp/motoristas/buscar-por-nome', { params: { nome: texto.trim() } });
+                    setSugestoesGlobaisRota(res.data || []);
+                } catch (err) {
+                    console.error("Erro na busca direta do banco:", err);
+                }
+            }, 400);
+        } else {
+            setSugestoesGlobaisRota([]);
         }
     };
     // 9. RENDERIZADOR DOS CARTÕES DA FILA DA ESCALA (PÁTIO COM CONTROLES VERTICAIS)
@@ -312,8 +382,9 @@ export default function DetalhePlantao() {
         const ehApoioManualFixo = item.isApoioManual === true || item.categoria === 'APOIO';
         const ehPlantonistaFila = item.categoria === 'PLANTAO';
 
+        const dadosFilaProcessada = renderizarFilaComLacunas();
         const ehPrimeiro = index === 0;
-        const ehUltimo = index === listaEscala.length - 1;
+        const ehUltimo = index === dadosFilaProcessada.length - 1;
 
         return (
             <View style={[styles.card, item.isPenalizado && styles.cardPenalizado, ehApoioManualFixo && styles.cardApoio]}>
@@ -346,7 +417,6 @@ export default function DetalhePlantao() {
                     {!!item.isPenalizado && <Text style={styles.txtAlerta}>⚠️ QUEIMOU A LARGADA (FIM DA FILA)</Text>}
                 </View>
 
-                {/* 🚀 LAYOUT VERTICAL: Agrupa as setas empilhadas acima do botão Remover */}
                 <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <View style={{ flexDirection: 'row', marginBottom: 4 }}>
                         <TouchableOpacity 
@@ -372,7 +442,7 @@ export default function DetalhePlantao() {
             </View>
         );
     };
-        // 10. RENDERIZADOR DAS ROTAS COMERCIAIS (TARDE E MADRUGADA) - SEM EMBUTIMENTO DE CONCORRÊNCIA
+    // 10. RENDERIZADOR DAS ROTAS COMERCIAIS (TARDE E MADRUGADA)
     const renderItemRotas = ({ item }: { item: IRotaAtribuida }) => {
         const empresasDaRota = item.empresas || [];
         const primeiraEmpresa = empresasDaRota.length > 0 ? empresasDaRota[0] : null;
@@ -442,50 +512,6 @@ export default function DetalhePlantao() {
             </View>
         );
     };
-    // 11. Processamento complementar em memória para injetar buracos de dados na FlatList
-        // Processamento complementar em memória para injetar buracos de dados na FlatList
-    const renderizarFilaComLacunas = (): IMotoristaEscala[] => {
-        if (listaEscala.length === 0) return [];
-        
-        const maiorPosicaoSalva = Math.max(...listaEscala.map(m => m.posicao || 0));
-        const filaCompleta: IMotoristaEscala[] = [];
-
-        for (let i = 1; i <= maiorPosicaoSalva; i++) {
-            const motoristaExistente = listaEscala.find(m => m.posicao === i);
-            if (motoristaExistente) {
-                filaCompleta.push(motoristaExistente);
-            } else {
-                filaCompleta.push({
-                    id: -i,
-                    posicao: i,
-                    categoria: "LIVRE",
-                    isPenalizado: false,
-                    whatsAppLid: `vaga_${i}`,
-                    motorista: { nome: "" }
-                } as any);
-                (filaCompleta[filaCompleta.length - 1] as any).isVagaOperacional = true;
-            }
-        }
-        return filaCompleta;
-    };
-
-    // Executa a busca de qualquer motorista ativo na tabela geral do banco para a tela cheia
-    const buscarMotoristasParaRota = async (texto: string) => {
-        setFiltroNomeRotaInput(texto);
-        if (texto.trim().length >= 3) {
-            try {
-                const res = await instancia.get('/whatsapp/motoristas/buscar-por-nome', {
-                    params: { nome: texto.trim() }
-                });
-                setSugestoesGlobaisRota(res.data || []);
-            } catch (err) {
-                console.error("Erro na busca direta do banco:", err);
-            }
-        } else {
-            setSugestoesGlobaisRota([]);
-        }
-    };
-
     // Renderiza a interface padrão se nenhuma alocação em tela cheia estiver ativa
     if (!rotaEmEdicaoObjeto) {
         return (
@@ -500,9 +526,17 @@ export default function DetalhePlantao() {
                             contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 20 }}
                             showsVerticalScrollIndicator={false} 
                             ListHeaderComponent={
-                                <View style={{ backgroundColor: '#fff', paddingTop: 20, marginBottom: 10 }}> 
+                                <View style={{ backgroundColor: '#fff', paddingTop: 20, marginBottom: 10, zIndex: 50 }}> 
                                     <View style={styles.headerSection}> 
-                                        <Text style={styles.header}>Painel de Escalas</Text> 
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={styles.header}>Painel de Escalas</Text> 
+                                            <TouchableOpacity 
+                                                style={{ backgroundColor: '#f5f5f5', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}
+                                                onPress={handleRedistribuirOriginal}
+                                            >
+                                                <Text style={{ color: '#0056b3', fontSize: 12, fontWeight: '700' }}>Reset Robô</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                         <Text style={styles.subHeader}>
                                             Fila do Dia: {dataExibicaoDinamica} {!!tipoDiaTexto ? `(${tipoDiaTexto.replace('_', ' ')})` : ''}
                                         </Text> 
@@ -521,7 +555,8 @@ export default function DetalhePlantao() {
                                         </TouchableOpacity> 
                                     </View> 
 
-                                    <View style={{ zIndex: 10, marginBottom: 5 }}>
+                                    {/* CONTÊINER GERAL DO FORMULÁRIO DO TOPO COM CAMADAS AJUSTADAS */}
+                                    <View style={styles.topFormWrapperMaster}>
                                         <View style={styles.miniFormularioFila}>
                                             <View style={{ flex: 2, position: 'relative' }}>
                                                 <TextInput 
@@ -548,6 +583,7 @@ export default function DetalhePlantao() {
                                             </TouchableOpacity>
                                         </View>
 
+                                        {/* CAIXA DE AUTOCOMPLETE FLUTUANTE DA ESCALA DO TOPO */}
                                         {sugestoesMotoristas.length > 0 && (
                                             <View style={styles.caixaSugestoes}>
                                                 {sugestoesMotoristas.map((item, idx) => (
@@ -578,9 +614,7 @@ export default function DetalhePlantao() {
                                 <View style={{ backgroundColor: '#fff', paddingTop: 20, marginBottom: 10 }}> 
                                     <View style={styles.headerSection}> 
                                         <Text style={styles.header}>Painel de Escalas</Text> 
-                                        <Text style={styles.subHeader}>
-                                            Execução do Turno: {dataExibicaoDinamica}
-                                        </Text> 
+                                        <Text style={styles.subHeader}>Execução do Turno: {dataExibicaoDinamica}</Text> 
                                         <View style={styles.linhaDestaque} /> 
                                     </View> 
 
@@ -606,15 +640,14 @@ export default function DetalhePlantao() {
         );
     }
 
-    // 🚀 INTERFACE DE BUSCA ISOLADA EM TELA CHEIA (QUANDO CLICADO EM SELECIONAR MOTORISTA)
     const idFisicoRotaAlvo = Number((rotaEmEdicaoObjeto as any).id_rota || rotaEmEdicaoObjeto.id);
     const identificadorOrdem = (rotaEmEdicaoObjeto.ordem || '').toUpperCase();
-
     return (
         <React.Fragment>
             <StatusBar barStyle="dark-content" />
             <View style={[styles.container, { paddingHorizontal: 20, paddingTop: 30 }]}>
-                <View style={{ marginBottom: 20 }}>
+                
+                <View style={styles.headerSectionCustom}>
                     <Text style={{ color: '#1a1a1a', fontSize: 20, fontWeight: '800' }}>Atribuição Manual Direta</Text>
                     <Text style={{ color: '#555555', fontSize: 13, marginTop: 4, fontWeight: '600' }}>
                         Destino: {identificadorOrdem} {rotaEmEdicaoObjeto.tipo === 'APOIO' ? '(VAGA DO APOIO)' : ''}
@@ -622,7 +655,7 @@ export default function DetalhePlantao() {
                     <View style={[styles.linhaDestaque, { marginTop: 8 }]} />
                 </View>
 
-                <View style={{ marginBottom: 15 }}>
+                <View style={styles.searchContainerMaster}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#1a1a1a', marginBottom: 8 }}>Digite o nome para buscar no banco de dados:</Text>
                     <TextInput
                         style={{ backgroundColor: '#f9f9f9', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ccc', fontSize: 15, color: '#333' }}
@@ -632,59 +665,59 @@ export default function DetalhePlantao() {
                         onChangeText={buscarMotoristasParaRota}
                         autoFocus
                     />
-                </View>
 
-                <FlatList
-                    data={sugestoesGlobaisRota}
-                    keyExtractor={(mot: any, idx: number) => mot.whatsAppLid ? `${mot.whatsAppLid}_${idx}` : String(idx)}
-                    contentContainerStyle={{ paddingBottom: 20 }}
-                    showsVerticalScrollIndicator={false}
-                    renderItem={({ item: mot }) => {
-                        const esRestritoRota = mot.podeFazerRota === false;
-                        return (
-                            <TouchableOpacity 
-                                style={{ paddingVertical: 14, paddingHorizontal: 12, backgroundColor: '#fff', borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-                                disabled={esRestritoRota}
-                                onPress={() => {
-                                    Alert.alert(
-                                        "Confirmar Vínculo",
-                                        `Deseja alocar *${mot.nome}* na rota extra *${identificadorOrdem}*?`,
-                                        [
-                                            { text: "Cancelar", style: "cancel" },
-                                            { 
-                                                text: "Sim, Vincular", 
-                                                onPress: async () => {
-                                                    setRotaEmEdicaoObjeto(null);
-                                                    await handleForcarRotaApoio(mot.whatsAppLid, idFisicoRotaAlvo);
-                                                } 
-                                            }
-                                        ]
+                    {filtroNomeRotaInput.trim().length >= 3 && sugestoesGlobaisRota && sugestoesGlobaisRota.length > 0 && (
+                        <View style={styles.caixaSugestoes}>
+                            <FlatList
+                                data={sugestoesGlobaisRota}
+                                keyboardShouldPersistTaps="handled"
+                                keyExtractor={(mot: any, idx: number) => mot.whatsAppLid ? `${mot.whatsAppLid}_${idx}` : String(idx)}
+                                style={{ maxHeight: 250 }}
+                                renderItem={({ item: mot }) => {
+                                    const esRestritoRota = mot.podeFazerRota === false;
+                                    return (
+                                        <TouchableOpacity 
+                                            style={styles.opcaoSugerida}
+                                            disabled={esRestritoRota}
+                                            onPress={() => {
+                                                Alert.alert(
+                                                    "Confirmar Vínculo",
+                                                    `Deseja alocar *${mot.nome}* na rota extra *${identificadorOrdem}*?`,
+                                                    [
+                                                        { text: "Cancelar", style: "cancel" },
+                                                        { 
+                                                            text: "Sim, Vincular", 
+                                                            onPress: async () => {
+                                                                setRotaEmEdicaoObjeto(null);
+                                                                await handleForcarRotaApoio(mot.whatsAppLid, idFisicoRotaAlvo);
+                                                            } 
+                                                        }
+                                                    ]
+                                                );
+                                            }}
+                                        >
+                                            <Text style={[styles.txtOpcaoSugerida, { color: esRestritoRota ? '#aaa' : '#333' }]}>
+                                                👤 {mot.nome} {esRestritoRota ? '(SÓ PLANTÃO)' : ''}
+                                            </Text>
+                                        </TouchableOpacity>
                                     );
                                 }}
-                            >
-                                <Text style={{ fontSize: 14, color: esRestritoRota ? '#aaa' : '#1a1a1a', fontWeight: '700', flex: 1 }}>
-                                    👤 {mot.nome}
-                                </Text>
-                                {esRestritoRota && (
-                                    <Text style={{ fontSize: 10, color: '#cf1322', fontWeight: '800', backgroundColor: '#fff1f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                        SÓ PLANTÃO
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-                        );
-                    }}
-                    ListEmptyComponent={
-                        filtroNomeRotaInput.trim().length >= 3 ? (
-                            <Text style={{ color: '#999', textAlign: 'center', marginTop: 30, fontSize: 14, fontStyle: 'italic' }}>
-                                Nenhum motorista correspondente encontrado no banco.
-                            </Text>
-                        ) : (
-                            <Text style={{ color: '#999', textAlign: 'center', marginTop: 30, fontSize: 14, fontStyle: 'italic' }}>
-                                Digite 3 ou mais letras acima para iniciar o cruzamento de dados.
-                            </Text>
-                        )
-                    }
-                />
+                            />
+                        </View>
+                    )}
+                </View>
+
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                    {filtroNomeRotaInput.trim().length >= 3 && sugestoesGlobaisRota.length === 0 ? (
+                        <Text style={{ color: '#999', textAlign: 'center', fontSize: 14, fontStyle: 'italic' }}>
+                            Nenhum motorista correspondente encontrado no banco.
+                        </Text>
+                    ) : filtroNomeRotaInput.trim().length < 3 ? (
+                        <Text style={{ color: '#999', textAlign: 'center', fontSize: 14, fontStyle: 'italic' }}>
+                            Digite 3 ou mais letras acima para iniciar o cruzamento de dados.
+                        </Text>
+                    ) : null}
+                </View>
 
                 <TouchableOpacity 
                     style={{ backgroundColor: '#f5f5f5', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 10, marginBottom: 20, borderWidth: 1, borderColor: '#ddd' }}
@@ -702,6 +735,7 @@ export default function DetalhePlantao() {
 const styles = StyleSheet.create({ 
     container: { flex: 1, backgroundColor: '#fff' }, 
     headerSection: { marginBottom: 15 }, 
+    headerSectionCustom: { marginBottom: 20, zIndex: 10, elevation: 10 }, 
     header: { color: '#1a1a1a', fontSize: 26, fontWeight: '800' }, 
     subHeader: { color: '#555555', fontSize: 14, marginTop: 4, fontWeight: '600' }, 
     linhaDestaque: { height: 4, width: 35, backgroundColor: '#0056b3', marginTop: 12, borderRadius: 2 }, 
@@ -734,27 +768,17 @@ const styles = StyleSheet.create({
     controlesFila: { flexDirection: 'row', alignItems: 'center' },
     btnSeta: { padding: 6, backgroundColor: '#f5f5f5', borderRadius: 8, marginHorizontal: 2, width: 28, alignItems: 'center' },
     txtSeta: { fontSize: 11, fontWeight: 'bold', color: '#333' },
+    
+    // 🔥 CAMADAS CORRIGIDAS: Força o invólucro do formulário e as sugestões flutuantes a ficarem por cima do pátio de escalas
+    topFormWrapperMaster: { position: 'relative', zIndex: 100, elevation: 100 },
     miniFormularioFila: { flexDirection: 'row', padding: 10, backgroundColor: '#f9f9f9', borderRadius: 12, marginBottom: 5, borderWidth: 1, borderColor: '#eee', alignItems: 'center' },
     miniInput: { backgroundColor: '#fff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', fontSize: 13, marginRight: 5, color: '#333' },
     miniInputNome: { backgroundColor: '#fff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', fontSize: 13, marginRight: 5, color: '#333', height: 38 },
     btnMiniFormAdicionar: { backgroundColor: '#0056b3', width: 36, height: 34, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
     txtBtnMiniFormAdicionar: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-    caixaSugestoes: { 
-        backgroundColor: '#fff', 
-        borderRadius: 10, 
-        borderWidth: 1, 
-        borderColor: '#ddd', 
-        position: 'absolute', 
-        top: 55, 
-        width: '100%', 
-        paddingHorizontal: 5, 
-        zIndex: 50, 
-        elevation: 5, 
-        shadowColor: '#000', 
-        shadowOffset: { width: 0, height: 3 }, 
-        shadowOpacity: 0.1, 
-        shadowRadius: 5
-    },
+    
+    searchContainerMaster: { marginBottom: 15, zIndex: 999, elevation: 999, position: 'relative' },
+    caixaSugestoes: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#ddd', position: 'absolute', top: 55, width: '100%', paddingHorizontal: 5, zIndex: 1000, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 5 },
     opcaoSugerida: { paddingVertical: 12, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
     txtOpcaoSugerida: { fontSize: 14, color: '#333', fontWeight: '600' }
 });

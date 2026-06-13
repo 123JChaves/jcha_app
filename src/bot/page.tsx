@@ -37,51 +37,59 @@ export default function PainelBot() {
         await executarComando('/whatsapp/status-cadastro', `Status Cadastro: ${valor ? 'Aberto' : 'Fechado'}`, { aberto: valor });
     };
 
-    // 🚀 NOVO GATILHO 1: Dispara o texto formatado do turno da Tarde no grupo
+    // 🚀 GATILHO 1: Disparar Tarde (Gatilho real parametrizado por dia puro)
     const handleDispararTardeWhats = async () => {
         const numeros = dataEdicao.replace(/\D/g, ''); 
         if (numeros.length !== 8) { 
             Alert.alert("Data Incompleta", "Digite a data DD/MM/AAAA para saber de qual dia enviar a Tarde."); 
             return; 
         } 
+        // Isola os dois primeiros dígitos (ex: "09" vira 9)
         const diaAlvo = parseInt(numeros.substring(0, 2), 10);
         
         setLoading(true);
         try {
-            // Consome o endpoint GET parametrizado por dia que você já criou no Express
+            // ⚡ Consome o endpoint correto de GATILHO do robô que você validou
             await instancia.get(`/whatsapp/escala/tarde/${diaAlvo}`);
+            
             Alert.alert("Sucesso", `Turno da tarde do dia ${diaAlvo} enviado para o grupo!`);
             setDataEdicao("");
             Keyboard.dismiss();
-        } catch (error) {
+        } catch (error: any) {
+            console.error("Erro no gatilho da tarde:", error.message);
             Alert.alert("Erro", "Não foi possível disparar o relatório da tarde.");
         } finally {
-            setLoading(false);
+            setLoading(false); // Destrava a interface sempre
         }
     };
 
-    // 🚀 NOVO GATILHO 2: Dispara o texto formatado do turno da Madrugada no grupo
+    // 🚀 GATILHO 2: Disparar Madrugada (Gatilho real parametrizado por dia puro)
     const handleDispararMadrugadaWhats = async () => {
         const numeros = dataEdicao.replace(/\D/g, ''); 
         if (numeros.length !== 8) { 
             Alert.alert("Data Incompleta", "Digite a data DD/MM/AAAA para saber de qual dia enviar a Madrugada."); 
             return; 
         } 
+        // Isola os dois primeiros dígitos (ex: "09" vira 9)
         const diaAlvo = parseInt(numeros.substring(0, 2), 10);
         
         setLoading(true);
         try {
-            // Consome o endpoint GET parametrizado por dia que você já criou no Express
+            // ⚡ Consome o endpoint correto de GATILHO do robô que você validou
             await instancia.get(`/whatsapp/escala/madrugada/${diaAlvo}`);
+            
             Alert.alert("Sucesso", `Turno da madrugada do dia ${diaAlvo} enviado para o grupo!`);
             setDataEdicao("");
             Keyboard.dismiss();
-        } catch (error) {
+        } catch (error: any) {
+            console.error("Erro no gatilho da madrugada:", error.message);
             Alert.alert("Erro", "Não foi possível disparar o relatório da madrugada.");
         } finally {
-            setLoading(false);
+            setLoading(false); // Destrava a interface sempre
         }
     };
+
+
     const handleConfigurarDataEspecifica = (tipo: 'DIA_LIVRE' | 'DIA_COMUM') => { 
         const numeros = dataEdicao.replace(/\D/g, ''); 
         if (numeros.length !== 8) { 
