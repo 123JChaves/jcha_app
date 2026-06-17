@@ -40,7 +40,6 @@ export default function DetalhePlantao() {
     const [buscandoMotoristas, setBuscandoMotoristas] = useState<boolean>(false);
 
     // Estados para o Controle de Autocomplete Inline (Dentro dos Cards de Rota Vaga)
-    const [rotaIdEmEdicao, setRotaIdEmEdicao] = useState<number | null>(null);
     const [filtroNomeRotaInput, setFiltroNomeRotaInput] = useState<string>('');
     const [sugestoesGlobaisRota, setSugestoesGlobaisRota] = useState<any[]>([]);
 
@@ -61,7 +60,7 @@ export default function DetalhePlantao() {
         const mes = parseInt(partes[1], 10);
         const dia = parseInt(partes[2], 10);
         
-        const dataObjeto = new Date(ano, mes - 1, dia, 12, 0, 0, 0);
+        const dataObjeto = new Date(ano, mes -1, dia, 12, 0, 0, 0);
         dataObjeto.setDate(dataObjeto.getDate() - 1);
         
         return `${dataObjeto.getFullYear()}-${String(dataObjeto.getMonth() + 1).padStart(2, '0')}-${String(dataObjeto.getDate()).padStart(2, '0')}`;
@@ -88,9 +87,10 @@ export default function DetalhePlantao() {
                 setIdListaBanco(res.data.listaId || 0); 
             } else {
                 setListaRotas([]);
-                const dataGeracao = subtrairUmDia(id);
+
+                const dataParametro = abaAtiva === 'MADRUGADA' ? subtrairUmDia(id) : id;
                 const urlAlvo = abaAtiva === 'TARDE' ? `/whatsapp/rotas-tarde` : `/whatsapp/rotas-madrugada`;
-                const res = await instancia.get(urlAlvo, { params: { data: dataGeracao } });
+                const res = await instancia.get(urlAlvo, { params: { data: dataParametro } });
                 
                 // Normaliza o payload para aceitar arrays ou objetos indexados
                 const dadosCruas = res.data.dados || [];

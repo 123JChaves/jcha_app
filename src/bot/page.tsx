@@ -195,7 +195,7 @@ export default function PainelBot() {
                                 const diaAlvo = parseInt(numeros.substring(0, 2), 10);
                                 
                                 // Bate na rota parametrizada enviando o dia e forçando o disparo do relatório no grupo
-                                executarComando('/whatsapp/escala/refazer', `Disparar Escala Mãe do Dia ${diaAlvo}`, { 
+                                executarComando('/whatsapp/escala/refazer', `Disparar Escala do Dia ${diaAlvo}`, { 
                                     dia: diaAlvo, 
                                     enviarWhats: true 
                                 });
