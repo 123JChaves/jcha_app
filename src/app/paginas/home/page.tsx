@@ -4,12 +4,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MenuButtons } from '../../../componentes/MenuButtons';
+import { useAuth } from '../../../@types/auth/AuthContextData';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const { logout } = useAuth(); // Captura a função de logout para limpar a sessão
   
   const DOURADO = "#D4AF37"; 
+
+  // Função para gerenciar a confirmação e execução do logout
+  const executarLogout = () => {
+    Alert.alert(
+      "Sair", 
+      "Deseja encerrar a sessão?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Sair", 
+          style: "destructive", 
+          onPress: () => logout() // Dispara a limpeza do token JWT
+        }
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -28,7 +46,7 @@ export default function HomeScreen() {
               <Text style={styles.titulo}>Painel Link</Text>
               <Text style={styles.subtitulo}>Gestão de Transporte e Logística</Text>
             </View>
-            <TouchableOpacity style={styles.logout} onPress={() => Alert.alert("Sair", "Deseja encerrar a sessão?")}>
+            <TouchableOpacity style={styles.logout} onPress={executarLogout}>
               <MaterialCommunityIcons name="logout" size={24} color={DOURADO} />
             </TouchableOpacity>
           </View>
