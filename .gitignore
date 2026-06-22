@@ -185,3 +185,10 @@ vite.config.ts.timestamp-*
 
 # Others
 api.tsx
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
