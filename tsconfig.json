@@ -2,7 +2,19 @@
   "compilerOptions": {
     "strict": true,
     "moduleResolution": "bundler",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node", "jest"]
   },
-  "extends": "expo/tsconfig.base"
+  "extends": "expo/tsconfig.base",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "jcha_app/e2e",
+    "jcha_app/e2e/**/*",
+    "e2e",
+    "e2e/**/*"
+  ]
 }

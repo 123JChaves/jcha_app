@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Configuração padrão para a versão final do app (Bloqueia tudo que não for HTTPS oficial) -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- CONFIGURAÇÃO DE DEBUG: Só funciona enquanto você desenvolve no Expo Go -->
+    <debug-overrides>
+        <trust-anchors>
+            <!-- Permite que o Android aceite o certificado do seu computador (IP local) -->
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

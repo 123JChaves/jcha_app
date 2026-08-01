@@ -290,21 +290,42 @@ export default function DetalhePlantao() {
             "Deseja limpar as alterações manuais e rodar a redistribuição automática do robô para este dia?",
             [
                 { text: "Cancelar", style: "cancel" },
-                { text: "Sim, Redistribuir", style: "destructive", onPress: async () => {
-                    try {
-                        setLoading(true);
-                        const res = await instancia.post('/whatsapp/escala/redistribuir', null, { params: { data: id } });
-                        Alert.alert("Sucesso", res.data.message || "Escala redistribuída com sucesso!");
-                        carregarDadosAba();
-                    } catch (err: any) {
-                        Alert.alert("Erro ao redistribuir", err.response?.data?.error || "Falha na comunicação com o robô.");
-                    } finally {
-                        setLoading(false);
+                { 
+                    text: "Sim, Redistribuir", 
+                    style: "destructive", 
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            
+                            // Faz a chamada POST limpando configurações adicionais de log
+                            const res = await instancia.post(
+                                `/whatsapp/escala/redistribuir?data=${id}`, 
+                                {}
+                            );
+
+                            // Garante que a resposta possui a propriedade esperada
+                            if (!res.data || !res.data.message) {
+                                throw new Error("O servidor processou a ação, mas não retornou uma confirmação válida.");
+                            }
+
+                            // Alerta o usuário apenas com o texto de sucesso do robô
+                            Alert.alert("Sucesso", res.data.message);
+                            
+                            // Executa a atualização dos cards do pátio buscando o novo estado salvo do banco
+                            carregarDadosAba();
+                        } catch (err: any) {
+                            const mensagemErro = err.response?.data?.error || err.message || "Falha na comunicação com o robô.";
+                            Alert.alert("Erro ao redistribuir", mensagemErro);
+                        } finally {
+                            setLoading(false);
+                        }
                     }
-                }}
+                }
             ]
         );
     };
+
+
 
     const renderizarFilaComLacunas = (): IMotoristaEscala[] => {
         if (listaEscala.length === 0) return [];

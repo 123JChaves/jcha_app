@@ -1,0 +1,24 @@
+# 1. Imagem Node estável (evitamos alpine aqui por causa de bugs comuns com o Expo CLI)
+FROM node:20
+
+WORKDIR /app
+
+# 2. Copia os arquivos de dependência
+COPY package*.json ./
+
+# 3. Instala as dependências do projeto
+RUN npm install
+
+# 4. Copia o resto do código do app
+COPY . .
+
+# 5. Expõe a porta padrão do Metro Bundler (8081) e do túnel do Expo (19000/19001 se necessário)
+EXPOSE 8081
+
+# 6. Variáveis de ambiente cruciais para o Expo rodar no Docker:
+# EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0 obriga o Expo a aceitar conexões externas
+ENV EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+ENV NODE_ENV=development
+
+# 7. Inicia o servidor do Expo liberando o acesso na rede local
+CMD ["npx", "expo", "start", "--host", "lan"]

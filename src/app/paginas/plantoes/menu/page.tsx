@@ -11,19 +11,20 @@ export default function MenuPlantoes() {
     
     const AZUL_MOOVE = "#0056b3";
 
-    const onChange = (event: any, selectedDate?: Date) => {
-        // Correção para iOS: mantém o seletor aberto até o usuário terminar a ação
+    // Unificamos toda a lógica de alteração e fechamento em um único handler limpo
+    const handlePickerChange = (event: any, selectedDate?: Date) => {
+        // No Android, o picker deve fechar imediatamente após a seleção
         if (Platform.OS === 'android') {
             setShowPicker(false);
         }
 
-        // Se o usuário clicou em Cancelar ou fechou no Android, interrompe sem bugar o estado
-        if (event.type === 'dismissed') {
+        // Se o usuário cancelou (clicou fora ou no botão cancelar)
+        if (event?.type === 'dismissed') {
             setShowPicker(false);
             return;
         }
 
-        // Atualiza a data se o usuário selecionou uma com sucesso
+        // Se uma data válida foi escolhida
         if (selectedDate) {
             setDataSelecionada(selectedDate);
         }
@@ -34,10 +35,7 @@ export default function MenuPlantoes() {
         const mes = String(dataSelecionada.getMonth() + 1).padStart(2, '0');
         const dia = String(dataSelecionada.getDate()).padStart(2, '0');
         
-        // Gera o ID no formato AAAA-MM-DD para os parâmetros da rota
         const dataId = `${ano}-${mes}-${dia}`;
-
-        // Navega de forma segura enviando os parâmetros para o StackNavigator
         navigation.navigate('DetalhePlantao', { id: dataId });
     };
 
@@ -61,8 +59,9 @@ export default function MenuPlantoes() {
                 <DateTimePicker
                     value={dataSelecionada}
                     mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'} // Melhora o visual dependendo do sistema
-                    onChange={onChange}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    // Mantemos apenas a propriedade oficial estável para evitar conflito de APIs híbridas
+                    onChange={handlePickerChange}
                 />
             )}
 
