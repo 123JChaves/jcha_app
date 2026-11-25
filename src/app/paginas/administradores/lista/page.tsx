@@ -3,10 +3,10 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ActivityIndi
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import instancia from '../../../../service/api';
-import { IAdministrador } from '../../../../@types/interfaces/IAdministrador';
+import { IUsuario } from '../../../../@types/interfaces/IUsuario';
 
 export default function ListaAdministradores() {
-  const [admins, setAdmins] = useState<IAdministrador[]>([]);
+  const [admins, setAdmins] = useState<IUsuario[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
@@ -16,21 +16,15 @@ export default function ListaAdministradores() {
   const carregarAdmins = async () => {
     try {
       setLoading(true);
-      const res = await instancia.get<IAdministrador[]>('/administradores');
+      const res = await instancia.get<IUsuario[]>('/usuarios/papeis/admin');
       
-      // LOG DE DEBBUG: Mostra no terminal do Expo o formato real que o celular está recebendo
-      console.log("[ADMIN DEBUG] JSON bruto recebido:", JSON.stringify(res.data));
-
       if (res.data && Array.isArray(res.data)) {
         setAdmins(res.data);
       } else if (res.data && (res.data as any).data && Array.isArray((res.data as any).data)) {
-        // Fallback para caso o backend envie envelopado em um objeto .data
         setAdmins((res.data as any).data);
-      } else {
-        console.log("[ADMIN AVISO] Estrutura de dados recebida não é um array válido.");
       }
     } catch (err: any) {
-      console.error("[ADMIN ERRO CRÍTICO]:", err.message);
+      console.error("[ADMIN ERRO]:", err.message);
       Alert.alert("Erro", "Não foi possível carregar os administradores.");
     } finally {
       setLoading(false);
@@ -44,7 +38,7 @@ export default function ListaAdministradores() {
   const handleExcluir = (id: number, nome: string) => {
     Alert.alert(
       "Remover Administrador",
-      `Tem certeza que deseja excluir ${nome}?`,
+      `Tem certeza que deseja excluir o administrador ${nome}?`,
       [
         { text: "Cancelar", style: "cancel" },
         { 
@@ -52,7 +46,7 @@ export default function ListaAdministradores() {
           style: "destructive", 
           onPress: async () => {
             try {
-              await instancia.delete(`/administrador/${id}`);
+              await instancia.delete(`/usuario/${id}`);
               carregarAdmins();
             } catch (error) {
               Alert.alert("Erro", "Falha ao excluir.");
@@ -62,36 +56,32 @@ export default function ListaAdministradores() {
       ]
     );
   };
-  const renderItem = ({ item }: { item: IAdministrador }) => {
-    // BLINDAGEM DO FRONT: Evita que chaves de colunas nulas ou alteradas quebrem a string do layout
-    const nomeAdmin = item.nome || (item as any).NOME || 'Sem Nome';
-    const emailAdmin = item.email || (item as any).EMAIL || 'Sem E-mail';
-    const cpfAdmin = item.cpf || (item as any).CPF || 'Não informado';
 
+  const renderItem = ({ item }: { item: IUsuario }) => {
     return (
       <View style={styles.card}>
         <View style={styles.infoContainer}>
-          <Text style={styles.nome}>{nomeAdmin}</Text>
+          <Text style={styles.nome}>{item.nome}</Text>
           <View style={styles.row}>
              <MaterialCommunityIcons name="email-outline" size={14} color="#666" />
-             <Text style={styles.subInfo}>{emailAdmin}</Text>
+             <Text style={styles.subInfo}>{item.email}</Text>
           </View>
           <View style={styles.row}>
              <MaterialCommunityIcons name="card-account-details-outline" size={14} color="#999" />
-             <Text style={styles.cpf}>CPF: {cpfAdmin}</Text>
+             <Text style={styles.cpf}>CPF: {item.cpf}</Text>
           </View>
         </View>
 
         <View style={styles.acoes}>
           <TouchableOpacity 
-            onPress={() => navigation.navigate('CadastrarAdministrador', { id: item.id })} 
+            onPress={() => navigation.navigate('CadastrarUsuario', { id: item.id, roleOriginal: 'admin' })} 
             style={styles.botaoEditar}
           >
             <MaterialCommunityIcons name="pencil-outline" size={20} color={AZUL_MOOVE} />
           </TouchableOpacity>
 
           <TouchableOpacity 
-            onPress={() => handleExcluir(item.id, nomeAdmin)} 
+            onPress={() => handleExcluir(item.id, item.nome)} 
             style={styles.botaoExcluir}
           >
             <MaterialCommunityIcons name="trash-can-outline" size={20} color="#FF3B30" />
@@ -116,7 +106,6 @@ export default function ListaAdministradores() {
       ) : (
         <FlatList
           data={admins}
-          // Garante fallback de index caso o ID venha malformado no JSON bruto
           keyExtractor={(item, index) => item?.id?.toString() || index.toString()}
           renderItem={renderItem}
           ListEmptyComponent={<Text style={styles.empty}>Nenhum admin cadastrado.</Text>}

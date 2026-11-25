@@ -25,17 +25,18 @@ export default function CadastroEmpresa() {
   };
 
   const selecionarImagem = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'], 
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
 
-    if (!result.canceled) {
-      setImagem(result.assets[0]);
-    }
+      if (!result.canceled) {
+        setImagem(result.assets[0]);
+      }
   };
+
 
   const salvarEmpresa = async () => {
     if (!nome || !cnpj) {
