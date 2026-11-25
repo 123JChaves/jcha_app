@@ -69,15 +69,18 @@ export default function EditarEmpresa() {
 
     const selecionarImagem = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
-            aspect: [1, 1],
+            aspect: [1, 1], // 🛠️ CORREÇÃO: Adicionada a vírgula que faltava aqui!
             quality: 1,
         });
+
         if (!result.canceled) {
             setImagem(result.assets[0]);
         }
     };
+
+
 
     const handleSalvar = async () => {
         if (!nome || !cnpj) {

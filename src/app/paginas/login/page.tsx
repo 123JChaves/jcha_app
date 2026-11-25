@@ -5,7 +5,7 @@ import {
   TextInput, 
   TouchableOpacity, 
   StyleSheet, 
-  StatusBar, 
+  StatusBar,
   Alert, 
   ActivityIndicator, 
   KeyboardAvoidingView, 
@@ -15,6 +15,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../../@types/AuthContextData';
+import instancia from '../../../service/api';
+ 
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -22,7 +24,7 @@ export default function LoginScreen() {
   
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [exibirSenha, setExibirSenha] = useState(false); // Estado para controlar a visibilidade da senha
+  const [exibirSenha, setExibirSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
 
   const DOURADO = "#D4AF37";
@@ -34,31 +36,24 @@ export default function LoginScreen() {
 
     setCarregando(true);
     try {
-      const urlCompleta = `${process.env.EXPO_PUBLIC_IP_ONE}/administrador/login`;
-      
-      const resposta = await fetch(urlCompleta, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha })
-      });
+      // 1. Mudança para o Axios: Ele já usa a URL base correta configurada para o celular
+      const resposta = await instancia.post('/login', { email, senha });
 
-      const textoPuro = await resposta.text();
-      
-      if (!resposta.ok) {
-        try {
-          const dadosErro = JSON.parse(textoPuro);
-          throw new Error(dadosErro.message || 'Erro na autenticação.');
-        } catch {
-          throw new Error('Servidor retornou uma resposta inválida (HTML). Verifique o IP e as rotas.');
-        }
+      // 2. O Axios já faz o JSON.parse() automaticamente em res.data
+      if (resposta.data && resposta.data.token) {
+        Alert.alert("Sucesso", "Login realizado com sucesso!");
+        
+        // 3. Salva o token no Contexto de Autenticação e limpa os campos
+        await login(resposta.data.token); 
+      } else {
+        throw new Error('O servidor não retornou um token válido.');
       }
-
-      const dados = JSON.parse(textoPuro);
-
-      Alert.alert("Sucesso", "Login realizado com sucesso!");
-      await login(dados.token); 
     } catch (error: any) {
-      Alert.alert("Falha no login", error.message);
+      // 4. Captura mensagens de erro amigáveis tratadas pelo Axios ou pelo backend
+      const mensagemErro = error.response?.data?.erro || error.response?.data?.message || error.message;
+      
+      console.error("[LOGIN ERRO]:", mensagemErro);
+      Alert.alert("Falha no login", "E-mail ou Senha inválidos!");
     } finally {
       setCarregando(false);
     }
@@ -99,13 +94,12 @@ export default function LoginScreen() {
           />
 
           <Text style={styles.label}>Senha</Text>
-          {/* Container criado para alinhar o input da senha e o botão do olho lado a lado */}
           <View style={styles.inputSenhaContainer}>
             <TextInput 
               style={styles.inputSenha} 
               placeholder="Sua senha secreta" 
               placeholderTextColor="#666"
-              secureTextEntry={!exibirSenha} // Inverte o boolean (se exibirSenha for true, secureTextEntry vira false)
+              secureTextEntry={!exibirSenha}
               value={senha}
               onChangeText={setSenha}
             />
@@ -140,23 +134,20 @@ const styles = StyleSheet.create({
   form: { backgroundColor: '#1c1c1c', padding: 20, borderRadius: 12 },
   label: { color: '#CCC', fontSize: 14, marginBottom: 8, fontWeight: '500' },
   input: { backgroundColor: '#2a2a2a', color: '#FFF', padding: 15, borderRadius: 8, marginBottom: 20, fontSize: 16 },
-  
-  // Estilização nova para o container e o olho
-  // Altere apenas estas 3 propriedades dentro do seu StyleSheet.create:
   inputSenhaContainer: { 
     flexDirection: 'row', 
     backgroundColor: '#2a2a2a', 
     borderRadius: 8, 
     alignItems: 'center',
     marginBottom: 20,
-    position: 'relative' // Permite o alinhamento correto do botão
+    position: 'relative'
   },
   inputSenha: { 
     flex: 1, 
     color: '#FFF', 
     padding: 15, 
     fontSize: 16,
-    paddingRight: 50 // Dá espaço para o texto não ficar embaixo do olho
+    paddingRight: 50
   },
   iconeOlho: { 
     position: 'absolute',
