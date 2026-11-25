@@ -184,7 +184,7 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Others
-api.tsx
+# api.tsx (versionado: nao contem segredos, le as URLs do .env)
 
 # Playwright
 /test-results/
